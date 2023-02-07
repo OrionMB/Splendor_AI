@@ -76,7 +76,7 @@ class Card(object):
         self.rank = rank
 
     def __print__(self):
-
+        print(self.id)
 
     def get_points(self):
         return self.points
