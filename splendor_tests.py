@@ -4,7 +4,7 @@ from main import *
 def test_player_take_gems():
     new_player = Player()
     print(new_player.get_gems())
-    new_player.take_gems([0, 2, 3])
+    new_player.take_gems(["k", "r", "w"])
     print(new_player.get_gems())
 
 
@@ -36,4 +36,4 @@ def test_import_nobles():
 
 
 play_game()
-
+# test_player_take_gems()

@@ -3,9 +3,8 @@ import random
 
 black, blue, green, red, white, yellow = 0, 1, 2, 3, 4, 5
 
-colors = {"black": 0, "blue": 1, "green": 2, "red": 3, "white": 4, "yellow": 5}
+colors = {"k": 0, "b": 1, "g": 2, "r": 3, "w": 4, "y": 5, "black": 0, "blue": 1, "green": 2, "red": 3, "white": 4, "yellow": 5}
 words = {v: k for k, v in colors.items()}
-
 
 def cost_string(costs):
     cost_s = ""
@@ -78,7 +77,7 @@ class Field(object):
 
     def remove_id(self, card_id):
         for card in self.deck_list:
-            if card.get_id() == card_id():
+            if card.get_id() == card_id:
                 self.deck_list.remove(card)
 
     def add_card(self, card):
@@ -108,6 +107,9 @@ class Player(object):
     def set_gems(self, gem_list):
         self.gems = gem_list
 
+    def set_cards(self, cards):
+        self.cards = cards
+
     def can_buy_card(self, card):
         card_costs = card.get_costs()
         total = 0
@@ -133,8 +135,10 @@ class Player(object):
     def take_gems(self, gem_list):
         original_gems = self.gems.copy()
         for gem in gem_list:
+            if gem in colors:
+                gem = colors[gem]
             self.gems[int(gem)] += 1
-        if sum(self.gems) > 10:
+        while sum(self.gems) > 10:
             returns = input(f'Please Return {sum(self.gems) - 10} gems')
             for gem in returns:
                 self.gems[gem] -= 1
@@ -146,6 +150,9 @@ class Player(object):
             return False
         new_gems = np.zeros(6)
         for gem in gem_list:
+            if gem in colors:
+                gem = int(colors[gem])
+            print(gem)
             if gem < 0 or gem > 4 or not isinstance(gem, int):
                 return False
             new_gems[int(gem)] += 1
@@ -161,18 +168,41 @@ class Player(object):
         self.reserves.add_card(card)
         return card
 
+    def earned_noble(self, noble_list):
+        earned = []
+        for noble in noble_list:
+            costs = noble.get_costs()
+            can_buy = True
+            for i in range(len(costs)):
+                if costs[i] > self.cards[i]:
+                    can_buy = False
+            if can_buy:
+                earned.append(noble)
+        if len(earned) == 1:
+            self.points += earned[0].get_points()
+            return earned[0]
+        if len(earned) > 1:
+           while True:
+                print("The following nobles are available:", earned)
+                x = input("which noble would you like?")
+                for noble in noble_list:
+                    if noble.get_id() == int(x):
+                        self.points += noble.get_points()
+                        return noble
+                print("Please enter a valid noble id")
+        return None
 
 
 class Card(object):
     def __init__(self, card_id, rank, points, color, costs):
         self.id = card_id
-        self.points = points
+        self.points = int(points)
         self.color = color
-        self.costs = costs
+        self.costs = list(map(int, costs))
         self.rank = rank
 
     def __repr__(self):
-        return "ID: "+ str(self.id) + ", " + str(self.points) + "Pt, Rank " + str(self.rank) + ", Col:" + words[
+        return "ID:"+ str(self.id) + ", " + str(self.points) + "Pt, Col:" + words[
             self.color] + ", Costs:" + cost_string(self.costs)
 
     def get_points(self):
@@ -195,15 +225,19 @@ class Noble(object):
     def __init__(self, noble_id, costs):
         self.id = noble_id
         self.costs = costs
+        self.points = 3
 
     def __repr__(self):
-        return "Noble with id " + str(self.id) + " and costs: " + cost_string(self.costs)
+        return "Noble: ID:" + str(self.id) + ", Costs:" + cost_string(self.costs)
 
     def get_costs(self):
         return self.costs
 
     def get_id(self):
         return self.id
+
+    def get_points(self):
+        return self.points
 
 
 class Game(object):
@@ -224,9 +258,11 @@ class Game(object):
                 player = self.player_list[i]
                 action_taken = False
                 while not action_taken:
-                    action = input(f"Player {i + 1}: (Take) Gems or (Buy) Card")
+                    for field in self.visible_cards:
+                        print(field)
+                    action = input(f"Player {i + 1}: (Take) Gems or (Buy) Card or (Reserve) Card")
                     if action.strip() == "Take":
-                        gems = input("What gems would you like to take?").split(",")
+                        gems = input("What gems would you like to take?").replace(" ", "").split(",")
                         if player.valid_take_gems(gems, self.gems):
                             gem_change = player.take_gems(gems)
                             for k in range(len(gem_change)):
@@ -236,8 +272,6 @@ class Game(object):
                             print("Not a valid gem selection")
                         print("Available Gems:", self.gems)
                     elif action.strip() == "Buy":
-                        for field in self.visible_cards:
-                            print(field)
                         print(player.get_reserves())
                         card_to_buy = self.all_cards[int(input("Card ID"))]
                         rank_index = card_to_buy.get_rank() - 1
@@ -255,16 +289,28 @@ class Game(object):
                     elif action.strip() == "Reserve":
                         if player.can_reserve_card():
                             print(self.visible_cards)
-                            card_to_reserve = self.all_cards[int(input("Card ID"))]
-                            player.reserve_card(card_to_reserve)
-                            new_draw = draw_cards(self.decks[card_to_reserve.get_rank() - 1], 1)
-                            self.visible_cards[card_to_reserve.get_rank() - 1].append(new_draw[0])
-                            if player.valid_take_gems([yellow], self.gems):
+                            entry = input("Card ID or Rank to Draw (ex, R1")
+                            if entry[0] == "R":
+                                card_to_reserve = draw_cards(self.decks[int(entry[1]) - 1], 1)
+                                player.reserve_card(card_to_reserve)
+                                action_taken = True
+                            elif entry.isnumeric():
+                                card_to_reserve = self.all_cards[int(entry)]
+                                player.reserve_card(card_to_reserve)
+                                new_draw = draw_cards(self.decks[card_to_reserve.get_rank() - 1], 1)
+                                self.visible_cards[card_to_reserve.get_rank() - 1].append(new_draw[0])
+                                action_taken = True
+                            else:
+                                "Not a valid reservation choice"
+                            if action_taken and player.valid_take_gems([yellow], self.gems):
                                 gem_change = player.take_gems([yellow])
                                 for k in range(len(gem_change)):
                                     self.gems[k] -= gem_change[k]
                         else:
                             print("Too many cards have been reserved")
+                    noble = player.earned_noble(self.nobles)
+                    if noble is not None:
+                        self.nobles.remove(noble)
 
     def game_over(self):
         for player in self.player_list:
